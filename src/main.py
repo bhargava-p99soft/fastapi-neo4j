@@ -1,15 +1,18 @@
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from neo4j import GraphDatabase
-from os import environ as env
+from os import getenv
 from typing import Dict, Any, Optional 
 import uuid
+from dotenv import load_dotenv
 app = FastAPI()
 
+load_dotenv()
+
 # Neo4j connection configuration
-NEO4J_URI = env['NEO4J_URI']  # Update this with your Neo4j URI
-NEO4J_USER = env['NEO4J_USER']
-NEO4J_PASSWORD = env['NEO4J_PASSWORD']
+NEO4J_URI = getenv('NEO4J_URI')  # Update this with your Neo4j URI
+NEO4J_USER = getenv('NEO4J_USER')
+NEO4J_PASSWORD = getenv('NEO4J_PASSWORD')
 
 class Neo4jConnection:
     def __init__(self, uri: str, user: str, password: str):
@@ -102,18 +105,14 @@ def create_table(table: Table, db: Neo4jConnection = Depends(get_db)):
     
     
     return {"table_id": result[0]["p.table_id"],"name": result[0]["p.name"], **dynamic_properties}
-    # # return {"table_id": result[0]["p.table_id"],"name": result[0]["p.name"], "dynamic_properties": dynamic_properties}
-    # return result[0]
+    
 
 @app.get("/tables/{table_id}")
 def get_table(table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 
-    # table_id = str(uuid.uuid4())
-
     query = """MATCH (p:Table {table_id: $table_id})
     RETURN p
     """
-    # dynamic_properties = {k: v for k, v in table.dynamic_properties.items() if isinstance(v, (str, int, float, bool, list))}
 
     result = db.query(query, {"table_id": str(table_id)})
     
@@ -126,15 +125,11 @@ def get_table(table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 @app.delete("/tables/{table_id}")
 def delete_table(table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 
-    # table_id = str(uuid.uuid4())
-
-    # db.query("""Match (t:Table {table_id: $table_id})-[r:column_of]-(c:Column)}) delete c""", {"table_id": str(table_id)})
-
 
     query = """MATCH (p:Table {table_id: $table_id})
     Delete p
     """
-    # dynamic_properties = {k: v for k, v in table.dynamic_properties.items() if isinstance(v, (str, int, float, bool, list))}
+    
 
     result = db.query(query, {"table_id": str(table_id)})
     
@@ -149,10 +144,6 @@ def delete_table(table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 def create_column(column: Column, table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 
     column_id = str(uuid.uuid4())
-
-    # query = """CREATE (p:Column {name: $name, column_id: $column_id, contextual_description: $contextual_description})
-    # SET p += $dynamic_properties
-    # RETURN p.column_id, p.name, p.contextual_description"""
 
     query = """
         MATCH (t: Table {table_id: $table_id}) 
@@ -205,9 +196,6 @@ def get_columns(table_id: uuid.UUID,column_id: uuid.UUID, db: Neo4jConnection = 
 
 @app.delete("/columns/{table_id}/{column_id}")
 def delete_column(table_id: uuid.UUID, column_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
-
-    # if(delete_relations("Column", "column_of", db) is False):
-    #     raise HTTPException(status_code=400, detail="Failed to delete column with relations")
 
     db.query("""Match (t:Table {table_id: $table_id})-[r:column_of]-(c:Column {column_id: $column_id}) delete r""", {"table_id": str(table_id), "column_id": str(column_id)})
 
@@ -285,9 +273,6 @@ def get_rules(table_id: uuid.UUID,rule_id: uuid.UUID, db: Neo4jConnection = Depe
 @app.delete("/rules/{table_id}/{rule_id}")
 def delete_rule(table_id: uuid.UUID, rule_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 
-    # if(delete_relations("Rule", "rule_of", db) is False):
-    #     raise HTTPException(status_code=400, detail="Failed to delete rule with relations")
-
     db.query("""Match (t:Table {table_id: $table_id})-[r:rule_of]-(c:Rule {rule_id: $rule_id}) delete r""", {"table_id": str(table_id), "rule_id": str(rule_id)})
 
     query = """MATCH (p:Rule {rule_id: $rule_id})
@@ -314,23 +299,7 @@ def delete_rule(table_id: uuid.UUID, rule_id: uuid.UUID, db: Neo4jConnection = D
 
 
 
-# if __name__ == '__main__':
-#     import uvicorn
-#     uvicorn.run(app)
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app)
 
-
-# data = {
-#     "a": "this should be a",
-#     "b": {
-#         "c": {
-#             "d": "this should be b.c.d",
-#         },
-#         "e": "this should be b.e"
-#     }
-# }
-
-# output = {
-#     "a": "this should be a",
-#     "b.c.d": "this should be b.c.d", 
-#     "b.e": "this should be b.e"
-# }

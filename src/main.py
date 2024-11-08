@@ -1,13 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
-from neo4j import GraphDatabase
-from os import getenv
-from typing import Dict, Any, Optional 
-import uuid
+from fastapi.responses import JSONResponse
+from .middlewares.cors import add_cors_middleware
+from .routes import tables, columns, rules, metadata
+# from os import getenv as env
 from dotenv import load_dotenv
-
-from .api.v1.routes import tables, columns, rules
-
 
 app = FastAPI(
     title="Fastapi Neo4j Application",
@@ -21,9 +17,21 @@ load_dotenv()
 app.include_router(tables.router)
 app.include_router(columns.router)
 app.include_router(rules.router)
+app.include_router(metadata.router)
 
 
-# if __name__ == '__main__':
-#     import uvicorn
-#     uvicorn.run(app)
+add_cors_middleware(app)
 
+# app.include_router(sample_router)
+
+
+@app.get("/")
+async def root():
+    return {"message": f"Hello, Fastapi Template Is Ready - {env['Environment']}"}
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from ..models.column import Column
-from ....config.database import Neo4jConnection, get_db
+# from ....config.database import Neo4jConnection, get_db
 from src.config.database import Neo4jConnection, get_db
 
 import uuid

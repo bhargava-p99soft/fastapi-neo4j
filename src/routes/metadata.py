@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from src.config.database import Neo4jConnection, get_db
 from ..utils.idgenerator import generate_custom_id
 from uuid import UUID
+from ..models.metadata import SearchResponse
+
 router = APIRouter()
 load_dotenv()
 
@@ -217,9 +219,9 @@ async def persist_metadata(database: str, db: Neo4jConnection = Depends(get_db))
 
 
 
-@router.put("/update-node/{custom_id}")
+@router.put("/add_metadata/{node_id}")
 async def update_node_properties(
-    custom_id: UUID, 
+    node_id: UUID, 
     properties: Dict[str, Any], 
     db: Neo4jConnection = Depends(get_db)
 ):
@@ -233,7 +235,7 @@ async def update_node_properties(
         """
         
         # Execute the query to update properties on the node
-        result = db.query(query, {"custom_id": str(custom_id), "properties": properties})
+        result = db.query(query, {"custom_id": str(node_id), "properties": properties})
         
         # Check if the node exists and was updated
         if not result:
@@ -244,3 +246,43 @@ async def update_node_properties(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating node: {e}")
+
+
+
+@router.get('/search-nodes/')
+async def search_nodes(keyword: str, db: Neo4jConnection = Depends(get_db)):
+    try:
+        # Convert the keyword to lowercase for case-insensitive search
+        keyword_lower = keyword.lower()
+
+        # Cypher query to search nodes where any property contains the keyword, case-insensitively
+        query = """
+        MATCH (n)
+        WHERE any(property IN keys(n) 
+                  WHERE toLower(toString(n[property])) CONTAINS toLower($keyword))
+        RETURN n
+        """
+        
+        # Execute the query with the case-insensitive keyword
+        result = db.query(query, {"keyword": keyword_lower})
+        
+        # If no nodes are found, return an empty list
+        if not result:
+            return SearchResponse(message="No nodes found matching the keyword", nodes=[])
+        
+        # Format the result to return the raw nodes as dictionaries
+        nodes = []
+        for record in result:
+            node = record.get("n")
+            
+            # Convert node to a dictionary and include all fields (extra fields included automatically)
+            node_data = dict(node)
+            
+            # Add the node to the list of nodes
+            nodes.append(node_data)
+        
+        return SearchResponse(message="Nodes found", nodes=nodes)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching nodes: {e}")
+

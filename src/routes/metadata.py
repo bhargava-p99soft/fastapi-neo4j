@@ -286,3 +286,47 @@ async def search_nodes(keyword: str, db: Neo4jConnection = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error searching nodes: {e}")
 
+
+
+
+@router.get("/search-tables-with-rules", response_model=SearchResponse)
+async def search_tables_with_rules(keyword: str, db: Neo4jConnection = Depends(get_db)):
+    try:
+        # Convert the keyword to lowercase for case-insensitive search
+        keyword_lower = keyword.lower()
+
+        # Cypher query to search for `Table` nodes containing the keyword and their related nodes through `rule_of` relationship
+        query = """
+        MATCH (t:Table)
+        WHERE any(property IN keys(t) 
+                  WHERE toLower(toString(t[property])) CONTAINS toLower($keyword))
+        OPTIONAL MATCH (r)-[:rule_of]->(t)
+        RETURN t, collect(r) AS rules
+        """
+        
+        # Execute the query with the case-insensitive keyword
+        result = db.query(query, {"keyword": keyword_lower})
+        
+        # If no nodes are found, return an empty list
+        if not result:
+            return SearchResponse(message="No matching tables found", nodes=[])
+
+        # Format the result to return the `Table` nodes and their related `Rule` nodes
+        nodes = []
+        for record in result:
+            table_node = record.get("t")
+            rules = record.get("rules", [])
+
+            # Convert the `Table` node to a dictionary and add related rules
+            table_data = {
+                "table": dict(table_node),  # Convert the table node to a dictionary
+                "rules": [dict(rule) for rule in rules]  # Convert each rule node to a dictionary
+            }
+            
+            # Add the table data to the nodes list
+            nodes.append(table_data)
+
+        return SearchResponse(message="Tables and related rules found", nodes=nodes)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching tables and rules: {e}")

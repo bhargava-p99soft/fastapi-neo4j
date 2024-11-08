@@ -18,10 +18,10 @@ def create_rule(rule: Rule, table_id: uuid.UUID, db: Neo4jConnection = Depends(g
     # RETURN p.rule_id, p.name, p.contextual_description"""
 
     query = """
-        MATCH (t: Table {table_id: $table_id}) 
-        CREATE (t) <-[r: rule_of]- (c: Rule {name: $name, rule_id: $rule_id, contextual_description: $contextual_description}) 
+        MATCH (t: Table {custom_id: $table_id}) 
+        CREATE (t) <-[r: rule_of]- (c: Rule {name: $name, custom_id: $rule_id, contextual_description: $contextual_description}) 
         SET c += $dynamic_properties
-        RETURN c.name, c.rule_id, c.contextual_description;
+        RETURN c.name, c.custom_id, c.contextual_description;
     """
 
     dynamic_properties = {k: v for k, v in rule.dynamic_properties.items() if isinstance(v, (str, int, float, bool, list))}
@@ -31,14 +31,14 @@ def create_rule(rule: Rule, table_id: uuid.UUID, db: Neo4jConnection = Depends(g
     if not result:
         raise HTTPException(status_code=400, detail="Failed to create rule")
     
-    return {"rule_id": result[0]["c.rule_id"],"name": result[0]["c.name"], "contextual_description": result[0]["c.contextual_description"], **dynamic_properties}
+    return {"custom_id": result[0]["c.custom_id"],"name": result[0]["c.name"], "contextual_description": result[0]["c.contextual_description"], **dynamic_properties}
 
 
 @router.get("/rules/{table_id}")
 def get_rules(table_id: uuid.UUID, db: Neo4jConnection = Depends(get_db)):
 
-    query = """MATCH (p:Rule)-[r:rule_of]-(t:Table {table_id: $table_id})
-    RETURN p
+    query = """MATCH (p:Rule)-[r:rule_of]-(t:Table {custom_id: $table_id})
+    RETURN p,t
     """
 
     result = db.query(query, {"table_id": str(table_id)})
